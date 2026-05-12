@@ -52,7 +52,7 @@ def run_health_check():
     server = HTTPServer(('0.0.0.0', int(os.environ.get("PORT", 10000))), HealthCheckHandler)
     server.serve_forever()
 
-def log_to_supabase(user_id, query, response):
+def log_to_supabase(user_id, username, query, response):
     try:
         data = {
             "user_id": str(user_id),
@@ -108,7 +108,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if response and response.text:
                 bot_text = response.text
                 # ذخیره لاگ در دیتابیس بدون دخالت در منطق هوش مصنوعی
-                log_to_supabase(user_id, user_text, bot_text)
+                log_to_supabase(user_id, username, user_text, bot_text)
                 
                 await update.message.reply_text(bot_text)
                 return 

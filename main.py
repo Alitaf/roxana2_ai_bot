@@ -103,7 +103,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     - PRICE & LINK: Mention price in text and link only ONCE at the end.
 
     LIVE PRODUCT DATA:
-    {current_inventory}
+    {cashed_inventory}
     """
     for model_name in target_models:
         try:

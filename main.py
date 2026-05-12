@@ -52,6 +52,18 @@ def run_health_check():
     server = HTTPServer(('0.0.0.0', int(os.environ.get("PORT", 10000))), HealthCheckHandler)
     server.serve_forever()
 
+def log_to_supabase(user_id, query, response):
+    try:
+        data = {
+            "user_id": str(user_id),
+            "user_query": query,
+            "bot_response": response
+        }
+        # نام جدول باید دقیقاً chat_logs باشد
+        supabase.table("chat_logs").insert(data).execute()
+    except Exception as e:
+        print(f"Logging Error: {e}")
+
 # ۴. تنظیمات Gemini (دقیقاً مثل کد قبلی شما)
 genai.configure(api_key=GEMINI_KEY)
 

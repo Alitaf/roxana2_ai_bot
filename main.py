@@ -70,6 +70,7 @@ genai.configure(api_key=GEMINI_KEY)
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text: return
     user_text = update.message.text
+    user_id = update.message.from_user.id
     
     # مدل‌های دقیق برنامه قبلی شما
     target_models = ['models/gemini-3.1-flash-lite', 'models/gemini-2.0-flash', 'models/gemini-1.5-flash']
@@ -103,8 +104,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             response = model.generate_content(f"{system_instruction}\n\nسوال کاربر: {user_text}")
             
             if response and response.text:
+                bot_text = response.text
+                # ذخیره لاگ در دیتابیس بدون دخالت در منطق هوش مصنوعی
                 log_to_supabase(user_id, user_text, bot_text)
-                await update.message.reply_text(response.text)
+                
+                await update.message.reply_text(bot_text)
                 return 
         except Exception as e:
             print(f"Model {model_name} failed: {e}")

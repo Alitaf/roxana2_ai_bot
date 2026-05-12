@@ -91,6 +91,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             response = model.generate_content(f"{system_instruction}\n\nسوال کاربر: {user_text}")
             
             if response and response.text:
+                log_to_supabase(user_id, user_text, bot_text)
                 await update.message.reply_text(response.text)
                 return 
         except Exception as e:

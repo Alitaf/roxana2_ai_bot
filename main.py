@@ -19,29 +19,27 @@ except Exception as e:
     print(f"Supabase Connection Error: {e}")
     supabase = None
 
-# ۲. تابع خواندن محصولات (جایگزین لیست ثابت قبلی)
+# ۲. تابع خواندن محصولات با سیستم کشینگ
 cached_inventory = "Inventory loading..."
+
 def get_live_inventory():
     if not supabase:
         return "Inventory unavailable."
     try:
-        # اضافه کردن brand به لیست ستون‌های انتخابی
         res = supabase.table("products").select("name, brand, price_dhs, link, description").eq("is_available", True).execute()
         
         inventory_text = ""
         for p in res.data:
-            # فرمت‌دهی دقیق برای فهماندن ساختار به هوش مصنوعی
             brand = p.get('brand', 'Unknown Brand')
             name = p.get('name', '')
             price = p['price_dhs']
             url = p.get('link', '')
             desc = p.get('description', '')
-            
             inventory_text += f"BRAND: {brand} | PRODUCT: {name} | PRICE: {price} Dhs | URL: {url} | FEATURES: {desc}\n"
         return inventory_text
     except Exception:
         return "Error fetching inventory."
-        
+
 # ۳. سرور سلامت برای رندر
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -53,7 +51,9 @@ def run_health_check():
     server = HTTPServer(('0.0.0.0', int(os.environ.get("PORT", 10000))), HealthCheckHandler)
     server.serve_forever()
 
+# ۴. تابع لاگ‌گذاری در دیتابیس (بدون وقفه)
 def log_to_supabase(user_id, username, query, response):
+    if not supabase: return
     try:
         data = {
             "user_id": str(user_id),
@@ -61,28 +61,22 @@ def log_to_supabase(user_id, username, query, response):
             "user_query": query,
             "bot_response": response
         }
-        # نام جدول باید دقیقاً chat_logs باشد
         supabase.table("chat_logs").insert(data).execute()
     except Exception as e:
         print(f"Logging Error: {e}")
 
-# ۴. تنظیمات Gemini (دقیقاً مثل کد قبلی شما)
+# ۵. تنظیمات Gemini
 genai.configure(api_key=GEMINI_KEY)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global cached_inventory
     if not update.message or not update.message.text: return
+    
     user_text = update.message.text
     user_id = update.message.from_user.id
     username = update.message.from_user.username or "No Username"
     
-    # مدل‌های دقیق برنامه قبلی شما
-    target_models = ['models/gemini-3.1-flash-lite', 'models/gemini-2.0-flash', 'models/gemini-1.5-flash']
-    
-    # گرفتن موجودی زنده
-    
-    # ۱. استفاده از کش برای موجودی (این کار سرعت شروع پاسخگویی را ۲-۳ ثانیه بالا می‌برد)
-    # اگر هنوز کش پر نشده، یکبار واکشی کن
+    # واکشی موجودی فقط برای بار اول جهت حفظ سرعت
     if cached_inventory == "Inventory loading...":
         cached_inventory = get_live_inventory()
     
@@ -90,21 +84,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     You are 'Roxana', a professional beauty consultant for Roxana Online Shop.
     
     CONVERSATION RULES:
-    1. GREETING: 
-       - ONLY greet the user (saying "Hello" or "سلام") if they have just started the conversation or specifically said hello.
-       - If you are already in a discussion or answering a follow-up question, DO NOT repeat the greeting or the "I'm happy to help" intro. Go straight to the answer.
-    2. CONSULTATION: Use the 'FEATURES' from the data to guide them naturally.
-    3. NO BULLET POINTS: Write in a natural, conversational flow.
-    4. LANGUAGE: Always match the user's language.
-
-    HOW TO USE PRODUCT DATA (Only when relevant):
-    - BRAND & PRODUCT: Use both to show expertise.
-    - DESCRIPTION: Explain the benefits naturally.
-    - PRICE & LINK: Mention price in text and link only ONCE at the end.
+    1. GREETING: ONLY greet if it's the start or they said hello. NO repeat greetings.
+    2. CONSULTATION: Use 'FEATURES' to guide naturally. NO BULLET POINTS.
+    3. LANGUAGE: Always match the user's language (Persian).
 
     LIVE PRODUCT DATA:
-    {cashed_inventory}
+    {cached_inventory}
     """
+    
+    target_models = ['models/gemini-3.1-flash-lite', 'models/gemini-2.0-flash', 'models/gemini-1.5-flash']
+    
     for model_name in target_models:
         try:
             model = genai.GenerativeModel(model_name)
@@ -113,11 +102,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if response and response.text:
                 bot_text = response.text
                 
-                # ۲. اول ارسال پاسخ به مشتری (بسیار مهم برای تجربه کاربری)
+                # گام حیاتی: اول ارسال پاسخ برای تجربه کاربری سریع
                 await update.message.reply_text(bot_text)
                 
-                # ۳. بلافاصله ارسال به دیتابیس در یک Thread جداگانه
-                # این کار کمتر از ۵ ثانیه طول می‌کشد و در دمو آنی دیده می‌شود
+                # گام دوم: ثبت در دیتابیس به صورت موازی (مناسب برای دمو)
                 threading.Thread(
                     target=log_to_supabase, 
                     args=(user_id, username, user_text, bot_text), 
@@ -126,15 +114,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 return 
         except Exception as e:
+            print(f"Model {model_name} failed: {e}")
             continue
             
     await update.message.reply_text("🔴 مشکلی در پردازش پیش آمد، لطفاً دوباره بپرسید.")
 
-
-
 if __name__ == '__main__':
+    # اجرای سلامت‌سنج در پس‌زمینه
     threading.Thread(target=run_health_check, daemon=True).start()
+    
     app = Application.builder().token(TELEGRAM_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
-    print("Roxana is starting with Supabase...")
-    app.run_polling(drop_pending_updates=True)
+    
+    print("Roxana is starting with Optimizations...")
+    # رفع مشکل تداخل با بستن حلقه‌های باز قبلی
+    app.run_polling(drop_pending_updates=True, close_loop=True)

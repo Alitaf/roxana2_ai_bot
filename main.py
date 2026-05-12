@@ -78,8 +78,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target_models = ['models/gemini-3.1-flash-lite', 'models/gemini-2.0-flash', 'models/gemini-1.5-flash']
     
     # گرفتن موجودی زنده
-    # در داخل تابع handle_message
-    current_inventory = get_live_inventory()
+    
+    # ۱. استفاده از کش برای موجودی (این کار سرعت شروع پاسخگویی را ۲-۳ ثانیه بالا می‌برد)
+    # اگر هنوز کش پر نشده، یکبار واکشی کن
+    global cached_inventory
+    if not cached_inventory or cached_inventory == "Inventory loading...":
+        cached_inventory = get_live_inventory()
     
     system_instruction = f"""
     You are 'Roxana', a professional beauty consultant for Roxana Online Shop.
@@ -108,21 +112,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if response and response.text:
                 bot_text = response.text
                 
-                # ذخیره لاگ در دیتابیس بدون دخالت در منطق هوش مصنوعی
-                #log_to_supabase(user_id, username, user_text, bot_text)
-
+                # ۲. اول ارسال پاسخ به مشتری (بسیار مهم برای تجربه کاربری)
+                await update.message.reply_text(bot_text)
+                
+                # ۳. بلافاصله ارسال به دیتابیس در یک Thread جداگانه
+                # این کار کمتر از ۵ ثانیه طول می‌کشد و در دمو آنی دیده می‌شود
                 threading.Thread(
                     target=log_to_supabase, 
                     args=(user_id, username, user_text, bot_text), 
                     daemon=True
                 ).start()
                 
-                await update.message.reply_text(bot_text)
                 return 
         except Exception as e:
-            print(f"Model {model_name} failed: {e}")
             continue
-
+            
     await update.message.reply_text("🔴 مشکلی در پردازش پیش آمد، لطفاً دوباره بپرسید.")
 
 

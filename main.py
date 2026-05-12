@@ -107,8 +107,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             if response and response.text:
                 bot_text = response.text
+                
                 # ذخیره لاگ در دیتابیس بدون دخالت در منطق هوش مصنوعی
-                log_to_supabase(user_id, username, user_text, bot_text)
+                #log_to_supabase(user_id, username, user_text, bot_text)
+
+                threading.Thread(
+                    target=log_to_supabase, 
+                    args=(user_id, username, user_text, bot_text), 
+                    daemon=True
+                ).start()
                 
                 await update.message.reply_text(bot_text)
                 return 

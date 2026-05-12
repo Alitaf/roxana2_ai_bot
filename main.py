@@ -20,6 +20,7 @@ except Exception as e:
     supabase = None
 
 # ۲. تابع خواندن محصولات (جایگزین لیست ثابت قبلی)
+cached_inventory = "Inventory loading..."
 def get_live_inventory():
     if not supabase:
         return "Inventory unavailable."
@@ -69,6 +70,7 @@ def log_to_supabase(user_id, username, query, response):
 genai.configure(api_key=GEMINI_KEY)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global cached_inventory
     if not update.message or not update.message.text: return
     user_text = update.message.text
     user_id = update.message.from_user.id
@@ -81,8 +83,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # ۱. استفاده از کش برای موجودی (این کار سرعت شروع پاسخگویی را ۲-۳ ثانیه بالا می‌برد)
     # اگر هنوز کش پر نشده، یکبار واکشی کن
-    global cached_inventory
-    if not cached_inventory or cached_inventory == "Inventory loading...":
+    if cached_inventory == "Inventory loading...":
         cached_inventory = get_live_inventory()
     
     system_instruction = f"""

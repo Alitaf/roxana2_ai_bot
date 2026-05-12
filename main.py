@@ -56,6 +56,7 @@ def log_to_supabase(user_id, query, response):
     try:
         data = {
             "user_id": str(user_id),
+            "username": username,
             "user_query": query,
             "bot_response": response
         }
@@ -71,6 +72,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text: return
     user_text = update.message.text
     user_id = update.message.from_user.id
+    username = update.message.from_user.username or "No Username"
     
     # مدل‌های دقیق برنامه قبلی شما
     target_models = ['models/gemini-3.1-flash-lite', 'models/gemini-2.0-flash', 'models/gemini-1.5-flash']
